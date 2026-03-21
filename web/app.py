@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from web.db import init_db
+from web.routes.jobs import router as jobs_router
 
 
 @asynccontextmanager
@@ -26,6 +27,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.include_router(jobs_router)
 
 
 @app.get("/health")
