@@ -10,8 +10,8 @@
 - [ ] **GENR-01**: User can select a date range (from/until) before generating a changelog
 - [ ] **GENR-02**: User can select which distribution targets to send to (Slack channels and/or email lists) before generating
 - [ ] **GENR-03**: User can configure tone/format (technical detail level) before generating
-- [ ] **GENR-04**: User can trigger changelog generation from the UI
-- [ ] **GENR-05**: User sees async generation progress while the pipeline runs (5–30s)
+- [x] **GENR-04**: User can trigger changelog generation from the UI
+- [x] **GENR-05**: User sees async generation progress while the pipeline runs (5–30s)
 - [ ] **GENR-06**: User can send the generated changelog to selected distribution targets
 - [ ] **GENR-07**: User sees per-channel send result (success or failure) after sending
 
@@ -58,8 +58,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GENR-01 | Phase 2 | Pending |
 | GENR-02 | Phase 2 | Pending |
 | GENR-03 | Phase 2 | Pending |
-| GENR-04 | Phase 1 | Pending |
-| GENR-05 | Phase 1 | Pending |
+| GENR-04 | Phase 1 | Complete |
+| GENR-05 | Phase 1 | Complete |
 | GENR-06 | Phase 2 | Pending |
 | GENR-07 | Phase 2 | Pending |
 | HIST-01 | Phase 3 | Pending |
