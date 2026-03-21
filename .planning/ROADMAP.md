@@ -27,7 +27,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Polling the job status endpoint returns the current pipeline stage (fetching, parsing, generating, done, failed)
   3. A completed job's rendered output is retrievable via the job ID
   4. The existing CLI (`python3 changelog.py`) still runs independently and produces correct output
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — SQLite data layer + FastAPI app skeleton (requirements.txt, web/db.py, web/app.py)
+- [ ] 01-02-PLAN.md — Pipeline background runner + job API endpoints (web/tasks.py, web/routes/jobs.py)
 
 ### Phase 2: Operator Workflow
 **Goal**: A non-technical operator can open the web UI, configure a changelog run, generate it, and send it to distribution targets — end to end, without the CLI
@@ -56,6 +60,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Backend Foundation | 0/TBD | Not started | - |
+| 1. Backend Foundation | 0/2 | Not started | - |
 | 2. Operator Workflow | 0/TBD | Not started | - |
 | 3. History | 0/TBD | Not started | - |
