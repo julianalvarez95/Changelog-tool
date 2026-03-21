@@ -12,7 +12,7 @@ Three phases deliver a web UI layer over the existing Python CLI pipeline. Phase
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Backend Foundation** - Async job engine, SQLite schema, and polling endpoint that enable non-blocking pipeline execution
+- [x] **Phase 1: Backend Foundation** - Async job engine, SQLite schema, and polling endpoint that enable non-blocking pipeline execution (completed 2026-03-21)
 - [ ] **Phase 2: Operator Workflow** - Full configure → generate → send flow accessible from the web UI
 - [ ] **Phase 3: History** - Browse and view all past generated changelogs
 
@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — SQLite data layer + FastAPI app skeleton (requirements.txt, web/db.py, web/app.py)
-- [ ] 01-02-PLAN.md — Pipeline background runner + job API endpoints (web/tasks.py, web/routes/jobs.py)
+- [x] 01-02-PLAN.md — Pipeline background runner + job API endpoints (web/tasks.py, web/routes/jobs.py)
 
 ### Phase 2: Operator Workflow
 **Goal**: A non-technical operator can open the web UI, configure a changelog run, generate it, and send it to distribution targets — end to end, without the CLI
@@ -60,6 +60,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Backend Foundation | 1/2 | In Progress|  |
+| 1. Backend Foundation | 2/2 | Complete   | 2026-03-21 |
 | 2. Operator Workflow | 0/TBD | Not started | - |
 | 3. History | 0/TBD | Not started | - |
