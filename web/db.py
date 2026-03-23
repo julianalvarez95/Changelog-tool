@@ -81,7 +81,11 @@ def get_job(job_id: str) -> dict | None:
     conn.row_factory = sqlite3.Row
     try:
         row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        result = dict(row)
+        result["failed_repos"] = json.loads(result["failed_repos"]) if result.get("failed_repos") else []
+        return result
     finally:
         conn.close()
 
@@ -111,7 +115,12 @@ def list_jobs(limit: int = 50) -> list[dict]:
                LIMIT ?""",
             (limit,),
         ).fetchall()
-        return [dict(row) for row in rows]
+        result = []
+        for row in rows:
+            d = dict(row)
+            d["failed_repos"] = json.loads(d["failed_repos"]) if d.get("failed_repos") else []
+            result.append(d)
+        return result
     finally:
         conn.close()
 
