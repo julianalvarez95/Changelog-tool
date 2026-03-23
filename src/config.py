@@ -33,8 +33,7 @@ def _inject_env_secrets(config: dict) -> None:
     """Inject environment variables into config for convenience."""
     config["_env"] = {
         "github_token": os.getenv("GITHUB_TOKEN"),
-        "bitbucket_username": os.getenv("BITBUCKET_USERNAME"),
-        "bitbucket_app_password": os.getenv("BITBUCKET_APP_PASSWORD"),
+        "bitbucket_api_token": os.getenv("BITBUCKET_API_TOKEN"),
         "slack_bot_token": os.getenv("SLACK_BOT_TOKEN"),
         "gmail_address": os.getenv("GMAIL_ADDRESS"),
         "gmail_app_password": os.getenv("GMAIL_APP_PASSWORD"),
@@ -53,8 +52,8 @@ def _validate(config: dict) -> None:
 
     if has_github and not env.get("github_token"):
         print("[WARN] GITHUB_TOKEN not set but GitHub repos are configured.", file=sys.stderr)
-    if has_bitbucket and (not env.get("bitbucket_username") or not env.get("bitbucket_app_password")):
-        print("[WARN] BITBUCKET_USERNAME / BITBUCKET_APP_PASSWORD not set but Bitbucket repos are configured.", file=sys.stderr)
+    if has_bitbucket and not env.get("bitbucket_api_token"):
+        print("[WARN] BITBUCKET_API_TOKEN not set but Bitbucket repos are configured.", file=sys.stderr)
     if dist.get("slack") and not env.get("slack_bot_token"):
         print("[WARN] SLACK_BOT_TOKEN not set but Slack distribution is configured.", file=sys.stderr)
     if dist.get("email") and (not env.get("gmail_address") or not env.get("gmail_app_password")):

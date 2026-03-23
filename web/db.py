@@ -81,7 +81,11 @@ def get_job(job_id: str) -> dict | None:
     conn.row_factory = sqlite3.Row
     try:
         row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        result = dict(row)
+        result["failed_repos"] = json.loads(result["failed_repos"]) if result.get("failed_repos") else []
+        return result
     finally:
         conn.close()
 
@@ -95,6 +99,28 @@ def update_job_status(job_id: str, status: str, progress_message: str) -> None:
             (status, progress_message, job_id),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def list_jobs(limit: int = 50) -> list[dict]:
+    """Return recent jobs sorted by created_at DESC, without large rendered content fields."""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """SELECT id, status, since, until, failed_repos, created_at, completed_at, progress_message
+               FROM jobs
+               ORDER BY created_at DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        result = []
+        for row in rows:
+            d = dict(row)
+            d["failed_repos"] = json.loads(d["failed_repos"]) if d.get("failed_repos") else []
+            result.append(d)
+        return result
     finally:
         conn.close()
 

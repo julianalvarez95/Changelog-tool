@@ -12,8 +12,7 @@ BITBUCKET_API = "https://api.bitbucket.org/2.0"
 
 
 def fetch_commits(
-    username: str,
-    app_password: str,
+    api_token: str,
     workspace: str,
     repo: str,
     branch: str = "main",
@@ -23,26 +22,29 @@ def fetch_commits(
     """
     Fetch commits from a Bitbucket Cloud repo.
     Returns list of dicts: {sha, message, url, author, date}
+
+    Auth: Bitbucket HTTP access tokens (created in Bitbucket workspace settings)
+    use Bearer auth. These are different from Atlassian API tokens (id.atlassian.com).
     """
-    if not username or not app_password:
+    if not api_token:
         print(
-            f"[ERROR] BITBUCKET_USERNAME and BITBUCKET_APP_PASSWORD are required "
+            f"[ERROR] BITBUCKET_API_TOKEN is required "
             f"to fetch from {workspace}/{repo}",
             file=sys.stderr,
         )
         return []
 
-    auth = (username, app_password)
+    headers = {"Authorization": f"Bearer {api_token}"}
     url = f"{BITBUCKET_API}/repositories/{workspace}/{repo}/commits/{branch}"
     result = []
 
     try:
         while url:
-            resp = requests.get(url, auth=auth, timeout=30)
+            resp = requests.get(url, headers=headers, timeout=30)
             if resp.status_code == 401:
                 print(
                     f"[ERROR] Bitbucket auth failed for {workspace}/{repo}. "
-                    "Check BITBUCKET_USERNAME / BITBUCKET_APP_PASSWORD.",
+                    "Check BITBUCKET_API_TOKEN.",
                     file=sys.stderr,
                 )
                 return []

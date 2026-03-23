@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Changelog Tool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* ---------------------------------------------------------------
+       Base & Custom Properties
+    --------------------------------------------------------------- */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --color-accent:      #6366f1; /* indigo-500 */
+      --color-accent-dark: #4f46e5; /* indigo-600 */
+      --color-success:     #10b981; /* emerald-500 */
+      --color-danger:      #ef4444; /* red-500 */
+      --color-warning:     #f59e0b; /* amber-500 */
+    }
+
+    /* ---------------------------------------------------------------
+       State Panel Transitions
+    --------------------------------------------------------------- */
+    .state-panel {
+      display: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+    .state-panel.active {
+      display: block;
+    }
+    .state-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ---------------------------------------------------------------
+       Segmented Control (Tone Selector)
+    --------------------------------------------------------------- */
+    .seg-ctrl {
+      display: flex;
+      background: #1e293b; /* slate-800 */
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .seg-ctrl input[type="radio"] { display: none; }
+    .seg-ctrl label {
+      flex: 1;
+      text-align: center;
+      padding: 6px 12px;
+      border-radius: 7px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      color: #94a3b8; /* slate-400 */
+      transition: background 160ms ease, color 160ms ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .seg-ctrl input[type="radio"]:checked + label {
+      background: var(--color-accent);
+      color: #fff;
+    }
+    .seg-ctrl label:hover:not(.checked-label) {
+      color: #cbd5e1;
+    }
+
+    /* ---------------------------------------------------------------
+       Stage Pipeline
+    --------------------------------------------------------------- */
+    .stage-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      position: relative;
+    }
+    .stage-node:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 14px;
+      left: calc(50% + 18px);
+      right: calc(-50% + 18px);
+      height: 2px;
+      background: #334155; /* slate-700 */
+      transition: background 400ms ease;
+      z-index: 0;
+    }
+    .stage-node.completed:not(:last-child)::after {
+      background: var(--color-success);
+    }
+    .stage-node.active:not(:last-child)::after {
+      background: linear-gradient(90deg, var(--color-accent) 0%, #334155 100%);
+    }
+
+    .stage-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1e293b;
+      border: 2px solid #334155;
+      transition: all 300ms ease;
+      position: relative;
+      z-index: 1;
+      flex-shrink: 0;
+    }
+    .stage-node.active .stage-dot {
+      border-color: var(--color-accent);
+      background: rgba(99,102,241,0.15);
+    }
+    .stage-node.completed .stage-dot {
+      border-color: var(--color-success);
+      background: rgba(16,185,129,0.15);
+    }
+    .stage-node.failed .stage-dot {
+      border-color: var(--color-danger);
+      background: rgba(239,68,68,0.15);
+    }
+    .stage-label {
+      font-size: 0.6875rem;
+      font-weight: 500;
+      color: #475569; /* slate-600 */
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      transition: color 300ms ease;
+    }
+    .stage-node.active   .stage-label { color: #a5b4fc; }
+    .stage-node.completed .stage-label { color: var(--color-success); }
+    .stage-node.failed    .stage-label { color: var(--color-danger); }
+
+    /* ---------------------------------------------------------------
+       Pulse / Spinner Animations
+    --------------------------------------------------------------- */
+    @keyframes pulse-ring {
+      0%   { transform: scale(0.8); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    .pulse-ring::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid var(--color-accent);
+      animation: pulse-ring 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes progress-indeterminate {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(400%); }
+    }
+    .progress-bar-indeterminate {
+      width: 25%;
+      border-radius: 9999px;
+      background: var(--color-accent);
+      animation: progress-indeterminate 1.6s ease-in-out infinite;
+    }
+
+    /* ---------------------------------------------------------------
+       Typing Dots
+    --------------------------------------------------------------- */
+    @keyframes bounce-dot {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40%            { transform: translateY(-5px); opacity: 1; }
+    }
+    .typing-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: #6366f1;
+      display: inline-block;
+      animation: bounce-dot 1.2s ease infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* ---------------------------------------------------------------
+       Custom Checkbox
+    --------------------------------------------------------------- */
+    .custom-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 5px;
+      border: 2px solid #334155;
+      background: #1e293b;
+      cursor: pointer;
+      transition: all 140ms ease;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .custom-checkbox:checked {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+    }
+    .custom-checkbox:checked::after {
+      content: '';
+      position: absolute;
+      left: 3px; top: 1px;
+      width: 8px; height: 5px;
+      border-left: 2px solid #fff;
+      border-bottom: 2px solid #fff;
+      transform: rotate(-45deg);
+    }
+    .custom-checkbox:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
+    }
+
+    /* ---------------------------------------------------------------
+       Date Input
+    --------------------------------------------------------------- */
+    input[type="date"] {
+      color-scheme: dark;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.6);
+      cursor: pointer;
+    }
+
+    /* ---------------------------------------------------------------
+       Send Button States
+    --------------------------------------------------------------- */
+    .send-btn {
+      transition: all 200ms ease;
+    }
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    .send-btn:not(:disabled):hover {
+      transform: translateY(-1px);
+    }
+    .send-btn:not(:disabled):active {
+      transform: translateY(0);
+    }
+
+    /* ---------------------------------------------------------------
+       Card Hover
+    --------------------------------------------------------------- */
+    .card-hover {
+      transition: box-shadow 200ms ease, border-color 200ms ease;
+    }
+    .card-hover:hover {
+      box-shadow: 0 0 0 1px rgba(99,102,241,0.3), 0 8px 32px rgba(0,0,0,0.3);
+      border-color: rgba(99,102,241,0.4);
+    }
+
+    /* ---------------------------------------------------------------
+       Scrollbar
+    --------------------------------------------------------------- */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* ---------------------------------------------------------------
+       Tab Bar
+    --------------------------------------------------------------- */
+    .tab-bar {
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      background: #1e293b;
+      border-radius: 10px;
+    }
+    .tab-btn {
+      flex: 1;
+      text-align: center;
+      padding: 6px 16px;
+      border-radius: 7px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      color: #94a3b8;
+      background: transparent;
+      border: none;
+      outline: none;
+      transition: background 160ms ease, color 160ms ease;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .tab-btn.active {
+      background: var(--color-accent);
+      color: #fff;
+    }
+    .tab-btn:hover:not(.active) {
+      color: #cbd5e1;
+    }
+
+    /* ---------------------------------------------------------------
+       History — Status Badges
+    --------------------------------------------------------------- */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .badge-done    { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+    .badge-partial { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+    .badge-failed  { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+    .badge-progress{ background: rgba(100,116,139,0.15);color: #94a3b8; border: 1px solid rgba(100,116,139,0.25); }
+
+    /* ---------------------------------------------------------------
+       History — Skeleton Loader
+    --------------------------------------------------------------- */
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease infinite;
+      border-radius: 6px;
+    }
+
+    /* ---------------------------------------------------------------
+       History — Markdown pre block
+    --------------------------------------------------------------- */
+    .markdown-pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 16px;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-full font-sans antialiased" style="font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;">
+
+  <!-- ===== HEADER ===== -->
+  <header class="border-b border-slate-800/60 bg-slate-950/90 backdrop-blur-sm sticky top-0 z-50">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <!-- Logo Mark -->
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+             style="background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round" class="w-4 h-4 text-white">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
+        <div>
+          <span class="text-sm font-semibold text-white tracking-tight">Changelog Tool</span>
+          <span id="header-title" class="text-xs text-slate-500 ml-2 hidden sm:inline"></span>
+        </div>
+      </div>
+
+      <!-- Status Pill -->
+      <div id="header-status" class="hidden items-center gap-2 text-xs text-slate-400 bg-slate-800/60 px-3 py-1.5 rounded-full border border-slate-700/50">
+        <div id="header-status-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+        <span id="header-status-text">Ready</span>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 pb-3">
+      <div class="tab-bar w-48">
+        <button id="tab-generate" class="tab-btn active" onclick="switchTab('generate')">Generate</button>
+        <button id="tab-history"  class="tab-btn"        onclick="switchTab('history')">History</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="max-w-2xl mx-auto px-4 sm:px-6 py-10">
+
+    <!-- ================================================================
+         STATE 1 — CONFIGURE
+    ================================================================ -->
+    <div id="state-configure" class="state-panel">
+      <div class="mb-8 text-center">
+        <h1 class="text-2xl font-bold text-white tracking-tight">Generate Changelog</h1>
+        <p class="text-slate-400 mt-1.5 text-sm">Configure the time range and tone, then generate.</p>
+      </div>
+
+      <!-- Date Range Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-4 card-hover">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Date Range</h2>
+
+        <!-- Since Last Run Button -->
+        <button id="btn-since-last-run"
+                class="w-full mb-4 px-4 py-2.5 rounded-xl text-sm font-medium
+                       bg-indigo-500/10 border border-indigo-500/25 text-indigo-300
+                       hover:bg-indigo-500/20 hover:border-indigo-400/40 transition-all duration-150
+                       flex items-center justify-center gap-2 group hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               class="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity">
+            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          <span id="btn-since-last-run-text">Since last run</span>
+        </button>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="input-since" class="block text-xs font-medium text-slate-400 mb-1.5">From</label>
+            <input type="date" id="input-since"
+                   class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5
+                          text-sm text-slate-100 focus:outline-none focus:ring-2
+                          focus:ring-indigo-500/50 focus:border-indigo-500/60 transition-all" />
+          </div>
+          <div>
+            <label for="input-until" class="block text-xs font-medium text-slate-400 mb-1.5">To</label>
+            <input type="date" id="input-until"
+                   class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5
+                          text-sm text-slate-100 focus:outline-none focus:ring-2
+                          focus:ring-indigo-500/50 focus:border-indigo-500/60 transition-all" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Tone Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-4 card-hover">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Tone</h2>
+        <div class="seg-ctrl">
+          <input type="radio" name="tone" id="tone-business"   value="business"   />
+          <label for="tone-business">Business</label>
+          <input type="radio" name="tone" id="tone-technical"  value="technical"  />
+          <label for="tone-technical">Technical</label>
+          <input type="radio" name="tone" id="tone-executive"  value="executive"  />
+          <label for="tone-executive">Executive</label>
+        </div>
+        <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+          <p class="text-xs text-slate-600">For PMs &amp; stakeholders</p>
+          <p class="text-xs text-slate-600">For engineers</p>
+          <p class="text-xs text-slate-600">For leadership</p>
+        </div>
+      </div>
+
+      <!-- Distribution Card -->
+      <div id="distribution-card" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-6 card-hover hidden">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Send To</h2>
+        <div class="flex flex-col gap-3">
+          <label id="slack-label" class="hidden items-center gap-3 cursor-pointer group">
+            <input type="checkbox" id="check-slack" class="custom-checkbox" value="slack" />
+            <div class="flex items-center gap-2.5 flex-1">
+              <!-- Slack icon -->
+              <div class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 15a2 2 0 1 1-2-2h2v2zm1 0a2 2 0 0 1 2-2v5a2 2 0 0 1-4 0v-3h2zm8-8a2 2 0 1 1 2 2h-2V7zm-1 0a2 2 0 0 1-2 2H7a2 2 0 0 1 0-4h5a2 2 0 0 1 2 2zM9 17a2 2 0 1 1-2 2V17h2zm0-1a2 2 0 0 1 2 2v5a2 2 0 0 1-4 0V18a2 2 0 0 1 2-2zm8-8a2 2 0 1 1 2-2v2h-2zm0 1a2 2 0 0 1 2 2v5a2 2 0 0 1-4 0V11a2 2 0 0 1 2-2z" fill="#36C5F0"/>
+                </svg>
+              </div>
+              <div>
+                <span class="text-sm font-medium text-slate-200 group-hover:text-white transition-colors">Slack</span>
+                <p id="slack-channel" class="text-xs text-slate-500"></p>
+              </div>
+            </div>
+          </label>
+
+          <label id="email-label" class="hidden items-center gap-3 cursor-pointer group">
+            <input type="checkbox" id="check-email" class="custom-checkbox" value="email" />
+            <div class="flex items-center gap-2.5 flex-1">
+              <div class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     class="w-4 h-4">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                  <polyline points="22,6 12,13 2,6"/>
+                </svg>
+              </div>
+              <div>
+                <span class="text-sm font-medium text-slate-200 group-hover:text-white transition-colors">Email</span>
+                <p id="email-recipients" class="text-xs text-slate-500"></p>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Error Banner -->
+      <div id="config-error" class="hidden mb-4 flex items-start gap-3 bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span id="config-error-text" class="text-sm text-red-300"></span>
+      </div>
+
+      <!-- Submit -->
+      <button id="btn-generate"
+              class="w-full py-3 px-6 rounded-xl font-semibold text-sm text-white
+                     transition-all duration-150 flex items-center justify-center gap-2
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:ring-offset-2
+                     focus:ring-offset-slate-950"
+              style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);"
+              onmouseover="this.style.filter='brightness(1.1)'"
+              onmouseout="this.style.filter=''">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="w-4 h-4">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        Generate Changelog
+      </button>
+    </div>
+
+    <!-- ================================================================
+         STATE 2 — GENERATING
+    ================================================================ -->
+    <div id="state-generating" class="state-panel">
+      <div class="mb-8 text-center">
+        <h1 class="text-2xl font-bold text-white tracking-tight">Generating Changelog</h1>
+        <p class="text-slate-400 mt-1.5 text-sm">
+          <span id="gen-date-range" class="text-slate-300 font-medium"></span>
+        </p>
+      </div>
+
+      <!-- Stage Pipeline -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-4 overflow-x-auto">
+        <div class="flex items-start min-w-max mx-auto" id="stage-pipeline" style="width: 100%;">
+          <!-- Stages rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Progress Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-4">
+        <!-- Indeterminate progress bar -->
+        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden mb-4">
+          <div class="progress-bar-indeterminate h-full"></div>
+        </div>
+        <!-- Message -->
+        <div class="flex items-center gap-2.5">
+          <div class="flex gap-1">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+          <p id="gen-progress-msg" class="text-sm text-slate-300">Starting up…</p>
+        </div>
+      </div>
+
+      <!-- Error state (hidden by default) -->
+      <div id="gen-error-card" class="hidden bg-red-500/10 border border-red-500/25 rounded-2xl p-5 mb-4">
+        <div class="flex items-start gap-3 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0">
+            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+            <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <div>
+            <p class="font-semibold text-red-300 text-sm">Generation Failed</p>
+            <p id="gen-error-msg" class="text-xs text-red-400/80 mt-0.5">An unexpected error occurred.</p>
+          </div>
+        </div>
+        <button id="btn-retry"
+                class="w-full py-2.5 px-4 rounded-xl text-sm font-medium text-white
+                       bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600
+                       transition-all duration-150 flex items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               class="w-4 h-4">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          Try Again
+        </button>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         STATE 3 — SEND
+    ================================================================ -->
+    <div id="state-send" class="state-panel">
+      <!-- Success Header -->
+      <div class="mb-8 text-center">
+        <div class="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/25
+                    flex items-center justify-center mx-auto mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+               class="w-7 h-7 text-emerald-400">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <h1 class="text-2xl font-bold text-white tracking-tight">Changelog Generated!</h1>
+        <p class="text-slate-400 mt-1.5 text-sm">
+          <span id="send-date-range" class="text-slate-300 font-medium"></span>
+          <span class="mx-1.5 text-slate-600">&bull;</span>
+          <span id="send-tone-badge"
+                class="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full
+                       bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 capitalize"></span>
+        </p>
+      </div>
+
+      <!-- Partial Warning -->
+      <div id="partial-warning" class="hidden mb-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4">
+        <div class="flex items-start gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <div>
+            <p class="text-sm font-semibold text-amber-300">Partial Result</p>
+            <p class="text-xs text-amber-400/80 mt-0.5">Some repositories could not be processed:</p>
+            <ul id="failed-repos-list" class="mt-2 flex flex-wrap gap-1.5"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Distribution Send Buttons -->
+      <div id="send-targets-card" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-4 hidden">
+        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Distribute</h2>
+        <div id="send-buttons-container" class="flex flex-col gap-3"></div>
+      </div>
+
+      <!-- No targets notice -->
+      <div id="no-targets-notice" class="hidden mb-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 text-center">
+        <p class="text-sm text-slate-400">No distribution targets were selected.</p>
+        <p class="text-xs text-slate-600 mt-1">Configure Slack or Email in your config file to enable sending.</p>
+      </div>
+
+      <!-- Generate Another -->
+      <button id="btn-generate-another"
+              class="w-full py-3 px-6 rounded-xl font-semibold text-sm text-slate-300
+                     bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600
+                     transition-all duration-150 flex items-center justify-center gap-2
+                     focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:ring-offset-2
+                     focus:ring-offset-slate-950">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="w-4 h-4 opacity-70">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Generate Another
+      </button>
+    </div>
+
+    <!-- ================================================================
+         TAB: HISTORY
+    ================================================================ -->
+    <div id="tab-panel-history" class="state-panel">
+
+      <!-- ---- List View ---- -->
+      <div id="history-list-view">
+        <div class="mb-8 text-center">
+          <h1 class="text-2xl font-bold text-white tracking-tight">History</h1>
+          <p class="text-slate-400 mt-1.5 text-sm">Browse past changelog runs.</p>
+        </div>
+
+        <!-- Loading skeleton -->
+        <div id="history-loading" class="hidden flex flex-col gap-3">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div class="flex items-center justify-between gap-4">
+              <div class="flex flex-col gap-2 flex-1">
+                <div class="skeleton h-4 w-48"></div>
+                <div class="skeleton h-3 w-32"></div>
+              </div>
+              <div class="skeleton h-6 w-16 rounded-full"></div>
+              <div class="skeleton h-8 w-16 rounded-xl"></div>
+            </div>
+          </div>
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div class="flex items-center justify-between gap-4">
+              <div class="flex flex-col gap-2 flex-1">
+                <div class="skeleton h-4 w-56"></div>
+                <div class="skeleton h-3 w-36"></div>
+              </div>
+              <div class="skeleton h-6 w-16 rounded-full"></div>
+              <div class="skeleton h-8 w-16 rounded-xl"></div>
+            </div>
+          </div>
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div class="flex items-center justify-between gap-4">
+              <div class="flex flex-col gap-2 flex-1">
+                <div class="skeleton h-4 w-44"></div>
+                <div class="skeleton h-3 w-28"></div>
+              </div>
+              <div class="skeleton h-6 w-16 rounded-full"></div>
+              <div class="skeleton h-8 w-16 rounded-xl"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error state -->
+        <div id="history-error" class="hidden mb-4 flex items-start gap-3 bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               class="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <div class="flex-1">
+            <span id="history-error-text" class="text-sm text-red-300">Failed to load history.</span>
+            <button onclick="loadHistory()" class="ml-3 text-xs text-red-400 underline hover:text-red-300">Retry</button>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="history-empty" class="hidden text-center py-16">
+          <div class="w-14 h-14 rounded-full bg-slate-800/80 border border-slate-700/60
+                      flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                 class="w-6 h-6 text-slate-500">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </div>
+          <p class="text-slate-400 font-medium text-sm">No changelogs generated yet</p>
+          <p class="text-slate-600 text-xs mt-1.5">
+            Switch to the
+            <button onclick="switchTab('generate')"
+                    class="text-indigo-400 hover:text-indigo-300 underline transition-colors">Generate</button>
+            tab to create your first changelog.
+          </p>
+        </div>
+
+        <!-- Jobs list -->
+        <div id="history-jobs-list" class="flex flex-col gap-3"></div>
+      </div>
+
+      <!-- ---- Detail View ---- -->
+      <div id="history-detail-view" class="hidden">
+        <!-- Back button -->
+        <div class="mb-6">
+          <button onclick="showHistoryList()"
+                  class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200
+                         transition-colors duration-150 group">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-150">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back to list
+          </button>
+        </div>
+
+        <!-- Detail header -->
+        <div class="mb-6">
+          <div class="flex items-start gap-3 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <h1 id="detail-date-range" class="text-xl font-bold text-white tracking-tight truncate"></h1>
+              <p id="detail-created-at" class="text-xs text-slate-500 mt-1"></p>
+            </div>
+            <span id="detail-status-badge" class="badge mt-1"></span>
+          </div>
+        </div>
+
+        <!-- Partial warning (detail) -->
+        <div id="detail-partial-warning" class="hidden mb-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4">
+          <div class="flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <div>
+              <p class="text-sm font-semibold text-amber-300">Some repositories failed</p>
+              <ul id="detail-failed-repos" class="mt-2 flex flex-wrap gap-1.5"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Failed job notice -->
+        <div id="detail-failed-notice" class="hidden bg-red-500/10 border border-red-500/25 rounded-2xl p-5 mb-4">
+          <div class="flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0">
+              <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+              <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <div>
+              <p class="font-semibold text-red-300 text-sm">No content available for failed jobs</p>
+              <p class="text-xs text-red-400/80 mt-0.5">This job did not complete successfully.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading spinner for detail fetch -->
+        <div id="detail-loading" class="hidden flex flex-col gap-3">
+          <div class="skeleton h-4 w-full mb-2 rounded"></div>
+          <div class="skeleton h-4 w-5/6 mb-2 rounded"></div>
+          <div class="skeleton h-4 w-full mb-2 rounded"></div>
+          <div class="skeleton h-4 w-4/6 mb-2 rounded"></div>
+          <div class="skeleton h-4 w-full mb-2 rounded"></div>
+        </div>
+
+        <!-- Markdown content -->
+        <div id="detail-content" class="hidden">
+          <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Generated Content</h2>
+          <pre id="detail-markdown" class="markdown-pre"></pre>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="mt-16 pb-6 text-center">
+    <p class="text-xs text-slate-700">Changelog Tool &mdash; powered by your commits</p>
+  </footer>
+
+  <!-- ================================================================
+       JAVASCRIPT
+  ================================================================ -->
+  <script>
+  (() => {
+    'use strict';
+
+    // ----------------------------------------------------------------
+    // State
+    // ----------------------------------------------------------------
+    let appConfig     = null;
+    let currentJobId  = null;
+    let pollInterval  = null;
+    let selectedTone  = 'business';
+    let selectedTargets = [];
+    let jobSince      = '';
+    let jobUntil      = '';
+
+    // ----------------------------------------------------------------
+    // Utilities
+    // ----------------------------------------------------------------
+    function today() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function daysAgo(n) {
+      const d = new Date();
+      d.setDate(d.getDate() - n);
+      return d.toISOString().slice(0, 10);
+    }
+
+    function formatDateRange(since, until) {
+      const fmt = (s) => {
+        const [y, m, d] = s.split('-');
+        return new Date(+y, +m - 1, +d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      };
+      return `${fmt(since)} → ${fmt(until)}`;
+    }
+
+    function setVisible(el, visible) {
+      el.classList.toggle('hidden', !visible);
+    }
+
+    // ----------------------------------------------------------------
+    // State Transitions
+    // ----------------------------------------------------------------
+    const panels = {
+      configure:  document.getElementById('state-configure'),
+      generating: document.getElementById('state-generating'),
+      send:       document.getElementById('state-send'),
+    };
+
+    function showState(name) {
+      Object.entries(panels).forEach(([key, el]) => {
+        if (key === name) {
+          el.classList.add('active');
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => el.classList.add('visible'));
+          });
+        } else {
+          el.classList.remove('visible');
+          setTimeout(() => el.classList.remove('active'), 200);
+        }
+      });
+
+      // Update header status pill
+      const statusEl = document.getElementById('header-status');
+      const statusDot = document.getElementById('header-status-dot');
+      const statusText = document.getElementById('header-status-text');
+
+      if (name === 'generating') {
+        statusEl.classList.remove('hidden');
+        statusEl.classList.add('flex');
+        statusDot.className = 'w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse';
+        statusText.textContent = 'Generating…';
+      } else if (name === 'send') {
+        statusDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+        statusText.textContent = 'Ready to send';
+        statusEl.classList.remove('hidden');
+        statusEl.classList.add('flex');
+      } else {
+        statusEl.classList.add('hidden');
+        statusEl.classList.remove('flex');
+      }
+    }
+
+    // ----------------------------------------------------------------
+    // Stage Pipeline
+    // ----------------------------------------------------------------
+    const STAGES = [
+      { key: 'queued',     label: 'Queued'     },
+      { key: 'fetching',   label: 'Fetching'   },
+      { key: 'parsing',    label: 'Parsing'    },
+      { key: 'generating', label: 'Generating' },
+      { key: 'done',       label: 'Done'       },
+    ];
+
+    function buildStagePipeline() {
+      const container = document.getElementById('stage-pipeline');
+      container.innerHTML = '';
+      STAGES.forEach((s, i) => {
+        const node = document.createElement('div');
+        node.className = 'stage-node';
+        node.id = `stage-${s.key}`;
+        node.style.flex = '1';
+
+        const icon = stageSvg(s.key);
+        node.innerHTML = `
+          <div class="stage-dot">${icon}</div>
+          <span class="stage-label">${s.label}</span>
+        `;
+        container.appendChild(node);
+      });
+    }
+
+    function stageSvg(key) {
+      const icons = {
+        queued:     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 text-slate-500"><circle cx="12" cy="12" r="3"/></svg>`,
+        fetching:   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 text-slate-500"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`,
+        parsing:    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 text-slate-500"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
+        generating: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 text-slate-500"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+        done:       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 text-slate-500"><polyline points="20 6 9 17 4 12"/></svg>`,
+      };
+      return icons[key] || '';
+    }
+
+    function updateStages(status) {
+      const order = ['queued', 'fetching', 'parsing', 'generating', 'done'];
+      const currentIdx = order.indexOf(status === 'partial' ? 'done' : status);
+
+      STAGES.forEach((s, i) => {
+        const node = document.getElementById(`stage-${s.key}`);
+        if (!node) return;
+        node.classList.remove('active', 'completed', 'failed');
+
+        if (status === 'failed') {
+          const stageIdx = order.indexOf(s.key);
+          if (stageIdx < currentIdx) node.classList.add('completed');
+          else if (stageIdx === currentIdx) node.classList.add('failed');
+        } else {
+          const stageIdx = order.indexOf(s.key);
+          if (stageIdx < currentIdx) node.classList.add('completed');
+          else if (stageIdx === currentIdx) node.classList.add('active');
+        }
+
+        // Update dot icon color to match state
+        const dot = node.querySelector('.stage-dot');
+        if (dot) {
+          const svg = dot.querySelector('svg');
+          if (svg) {
+            if (node.classList.contains('active')) {
+              svg.querySelectorAll('[stroke]').forEach(el => el.setAttribute('stroke', '#a5b4fc'));
+            } else if (node.classList.contains('completed')) {
+              svg.querySelectorAll('[stroke]').forEach(el => el.setAttribute('stroke', '#10b981'));
+            } else if (node.classList.contains('failed')) {
+              svg.querySelectorAll('[stroke]').forEach(el => el.setAttribute('stroke', '#ef4444'));
+            } else {
+              svg.querySelectorAll('[stroke]').forEach(el => el.setAttribute('stroke', '#475569'));
+            }
+          }
+        }
+      });
+    }
+
+    // ----------------------------------------------------------------
+    // API Calls
+    // ----------------------------------------------------------------
+    async function fetchConfig() {
+      const res = await fetch('/config');
+      if (!res.ok) throw new Error(`Config fetch failed: ${res.status}`);
+      return res.json();
+    }
+
+    async function createJob(since, until, tone) {
+      const res = await fetch('/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ since, until, tone }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Job creation failed: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    async function getJob(jobId) {
+      const res = await fetch(`/jobs/${jobId}`);
+      if (!res.ok) throw new Error(`Job fetch failed: ${res.status}`);
+      return res.json();
+    }
+
+    async function sendJob(jobId, targets) {
+      const res = await fetch(`/jobs/${jobId}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targets }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Send failed: ${res.status}`);
+      }
+      return res.json();
+    }
+
+    // ----------------------------------------------------------------
+    // Init — Load Config
+    // ----------------------------------------------------------------
+    async function init() {
+      try {
+        appConfig = await fetchConfig();
+      } catch (e) {
+        appConfig = {
+          distribution: { slack: null, email: null },
+          tones: ['business', 'technical', 'executive'],
+          current_tone: 'business',
+          last_run: null,
+          title: 'Product Updates',
+        };
+      }
+
+      // Header title
+      if (appConfig.title) {
+        const titleEl = document.getElementById('header-title');
+        titleEl.textContent = appConfig.title;
+        titleEl.classList.remove('hidden');
+        titleEl.classList.add('inline');
+      }
+
+      // Populate date defaults
+      const sinceEl = document.getElementById('input-since');
+      const untilEl = document.getElementById('input-until');
+      untilEl.value = today();
+
+      if (appConfig.last_run) {
+        const lastRunDate = appConfig.last_run.slice(0, 10);
+        sinceEl.value = lastRunDate;
+
+        // Show "Since last run" button
+        const btn = document.getElementById('btn-since-last-run');
+        const d = new Date(lastRunDate + 'T00:00:00');
+        const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        document.getElementById('btn-since-last-run-text').textContent = `Since last run (${formatted})`;
+        btn.classList.remove('hidden');
+        btn.addEventListener('click', () => {
+          sinceEl.value = lastRunDate;
+        });
+      } else {
+        sinceEl.value = daysAgo(7);
+      }
+
+      // Populate tone
+      const toneToSelect = appConfig.current_tone || 'business';
+      const toneInput = document.getElementById(`tone-${toneToSelect}`);
+      if (toneInput) toneInput.checked = true;
+      selectedTone = toneToSelect;
+
+      // Distribution targets
+      const distCard = document.getElementById('distribution-card');
+      const slackConfig = appConfig.distribution?.slack;
+      const emailConfig = appConfig.distribution?.email;
+      let hasTargets = false;
+
+      if (slackConfig) {
+        const label = document.getElementById('slack-label');
+        const channelEl = document.getElementById('slack-channel');
+        label.classList.remove('hidden');
+        label.classList.add('flex');
+        channelEl.textContent = slackConfig.channel || '';
+        hasTargets = true;
+      }
+
+      if (emailConfig) {
+        const label = document.getElementById('email-label');
+        const recipientsEl = document.getElementById('email-recipients');
+        label.classList.remove('hidden');
+        label.classList.add('flex');
+        const recips = emailConfig.recipients || [];
+        recipientsEl.textContent = recips.length > 2
+          ? `${recips.slice(0, 2).join(', ')} +${recips.length - 2} more`
+          : recips.join(', ');
+        hasTargets = true;
+      }
+
+      if (hasTargets) {
+        distCard.classList.remove('hidden');
+      }
+
+      // Build stage pipeline
+      buildStagePipeline();
+
+      // Show initial state
+      showState('configure');
+    }
+
+    // ----------------------------------------------------------------
+    // Generate Button
+    // ----------------------------------------------------------------
+    document.getElementById('btn-generate').addEventListener('click', async () => {
+      const since = document.getElementById('input-since').value;
+      const until = document.getElementById('input-until').value;
+      const toneEl = document.querySelector('input[name="tone"]:checked');
+      const tone   = toneEl ? toneEl.value : 'business';
+
+      const errorEl   = document.getElementById('config-error');
+      const errorText = document.getElementById('config-error-text');
+
+      // Validate
+      if (!since || !until) {
+        errorText.textContent = 'Please select both a start and end date.';
+        setVisible(errorEl, true);
+        return;
+      }
+      if (since > until) {
+        errorText.textContent = '"From" date must be before or equal to the "To" date.';
+        setVisible(errorEl, true);
+        return;
+      }
+      setVisible(errorEl, false);
+
+      // Collect selected distribution targets
+      selectedTargets = [];
+      if (document.getElementById('check-slack')?.checked) selectedTargets.push('slack');
+      if (document.getElementById('check-email')?.checked) selectedTargets.push('email');
+
+      jobSince = since;
+      jobUntil = until;
+      selectedTone = tone;
+
+      // Update generating state UI
+      document.getElementById('gen-date-range').textContent = formatDateRange(since, until);
+      setVisible(document.getElementById('gen-error-card'), false);
+      updateStages('queued');
+      document.getElementById('gen-progress-msg').textContent = 'Queued…';
+
+      showState('generating');
+
+      try {
+        const job = await createJob(since, until, tone);
+        currentJobId = job.job_id;
+        startPolling(job.job_id);
+      } catch (e) {
+        showGenError(e.message);
+      }
+    });
+
+    // ----------------------------------------------------------------
+    // Polling
+    // ----------------------------------------------------------------
+    function startPolling(jobId) {
+      stopPolling();
+      pollInterval = setInterval(async () => {
+        try {
+          const job = await getJob(jobId);
+          onJobUpdate(job);
+        } catch (e) {
+          stopPolling();
+          showGenError(e.message);
+        }
+      }, 2000);
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    function onJobUpdate(job) {
+      const status = job.status;
+      updateStages(status);
+
+      if (job.progress_message) {
+        document.getElementById('gen-progress-msg').textContent = job.progress_message;
+      }
+
+      if (status === 'done' || status === 'partial') {
+        stopPolling();
+        transitionToSend(job);
+      } else if (status === 'failed') {
+        stopPolling();
+        showGenError(job.progress_message || 'The job failed unexpectedly.');
+      }
+    }
+
+    function showGenError(msg) {
+      const card = document.getElementById('gen-error-card');
+      document.getElementById('gen-error-msg').textContent = msg;
+      setVisible(card, true);
+    }
+
+    // ----------------------------------------------------------------
+    // Retry Button
+    // ----------------------------------------------------------------
+    document.getElementById('btn-retry').addEventListener('click', () => {
+      stopPolling();
+      showState('configure');
+    });
+
+    // ----------------------------------------------------------------
+    // Transition to Send State
+    // ----------------------------------------------------------------
+    function transitionToSend(job) {
+      // Date range & tone
+      document.getElementById('send-date-range').textContent =
+        formatDateRange(job.since || jobSince, job.until || jobUntil);
+      document.getElementById('send-tone-badge').textContent = selectedTone;
+
+      // Partial warning
+      const partialWarn = document.getElementById('partial-warning');
+      if (job.status === 'partial' && job.failed_repos && job.failed_repos.length > 0) {
+        setVisible(partialWarn, true);
+        const list = document.getElementById('failed-repos-list');
+        list.innerHTML = '';
+        job.failed_repos.forEach(repo => {
+          const li = document.createElement('li');
+          li.className = 'text-xs font-mono bg-amber-500/15 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-md';
+          li.textContent = repo;
+          list.appendChild(li);
+        });
+      } else {
+        setVisible(partialWarn, false);
+      }
+
+      // Send buttons
+      const sendCard      = document.getElementById('send-targets-card');
+      const noTargetNotice = document.getElementById('no-targets-notice');
+      const btnContainer  = document.getElementById('send-buttons-container');
+      btnContainer.innerHTML = '';
+
+      if (selectedTargets.length === 0) {
+        setVisible(sendCard, false);
+        setVisible(noTargetNotice, true);
+      } else {
+        setVisible(sendCard, true);
+        setVisible(noTargetNotice, false);
+        selectedTargets.forEach(target => {
+          const btn = buildSendButton(target);
+          btnContainer.appendChild(btn);
+        });
+      }
+
+      showState('send');
+    }
+
+    // ----------------------------------------------------------------
+    // Send Button Builder
+    // ----------------------------------------------------------------
+    function buildSendButton(target) {
+      const isSlack = target === 'slack';
+      const label   = isSlack ? 'Send to Slack' : 'Send via Email';
+      const icon    = isSlack
+        ? `<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+             <path d="M6 15a2 2 0 1 1-2-2h2v2zm1 0a2 2 0 0 1 2-2v5a2 2 0 0 1-4 0v-3h2zm8-8a2 2 0 1 1 2 2h-2V7zm-1 0a2 2 0 0 1-2 2H7a2 2 0 0 1 0-4h5a2 2 0 0 1 2 2zM9 17a2 2 0 1 1-2 2V17h2zm0-1a2 2 0 0 1 2 2v5a2 2 0 0 1-4 0V18a2 2 0 0 1 2-2zm8-8a2 2 0 1 1 2-2v2h-2zm0 1a2 2 0 0 1 2 2v5a2 2 0 0 1-4 0V11a2 2 0 0 1 2-2z" fill="#36C5F0"/>
+           </svg>`
+        : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 flex-shrink-0">
+             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+             <polyline points="22,6 12,13 2,6"/>
+           </svg>`;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex items-center gap-3';
+
+      const btn = document.createElement('button');
+      btn.className = `send-btn flex-1 py-2.5 px-4 rounded-xl text-sm font-medium text-white
+                       bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600
+                       transition-all duration-150 flex items-center gap-2.5`;
+      btn.innerHTML = `${icon}<span>${label}</span>`;
+
+      const resultEl = document.createElement('div');
+      resultEl.className = 'w-8 h-8 flex items-center justify-center flex-shrink-0';
+
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.innerHTML = `<div class="spinner"></div><span>Sending…</span>`;
+
+        try {
+          const res = await sendJob(currentJobId, [target]);
+          const result = res.results?.[target];
+          if (result?.success) {
+            resultEl.innerHTML = successIcon();
+            btn.innerHTML = `${icon}<span>${label}</span>`;
+            btn.classList.add('opacity-50');
+            btn.title = 'Sent successfully';
+          } else {
+            const errMsg = result?.error || 'Send failed';
+            resultEl.innerHTML = errorIcon(errMsg);
+            btn.disabled = false;
+            btn.innerHTML = `${icon}<span>${label}</span>`;
+          }
+        } catch (e) {
+          resultEl.innerHTML = errorIcon(e.message);
+          btn.disabled = false;
+          btn.innerHTML = `${icon}<span>${label}</span>`;
+        }
+      });
+
+      wrapper.appendChild(btn);
+      wrapper.appendChild(resultEl);
+      return wrapper;
+    }
+
+    function successIcon() {
+      return `<div title="Sent successfully" class="w-8 h-8 rounded-full bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-emerald-400">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>`;
+    }
+
+    function errorIcon(msg) {
+      return `<div title="${escHtml(msg)}" class="w-8 h-8 rounded-full bg-red-500/15 border border-red-500/25 flex items-center justify-center cursor-help">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-red-400">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </div>`;
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ----------------------------------------------------------------
+    // Generate Another
+    // ----------------------------------------------------------------
+    document.getElementById('btn-generate-another').addEventListener('click', () => {
+      currentJobId = null;
+      selectedTargets = [];
+      showState('configure');
+    });
+
+    // ----------------------------------------------------------------
+    // Tone Selection Listener (for inline state tracking)
+    // ----------------------------------------------------------------
+    document.querySelectorAll('input[name="tone"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        selectedTone = radio.value;
+      });
+    });
+
+    // ----------------------------------------------------------------
+    // Tab Navigation
+    // ----------------------------------------------------------------
+    let activeTab = 'generate';
+
+    // Expose switchTab globally so inline onclick handlers can reach it
+    window.switchTab = function switchTab(tab) {
+      if (tab === activeTab) return;
+      activeTab = tab;
+
+      // Update tab button styles
+      document.getElementById('tab-generate').classList.toggle('active', tab === 'generate');
+      document.getElementById('tab-history').classList.toggle('active',  tab === 'history');
+
+      if (tab === 'generate') {
+        // Show whichever generate panel was last visible
+        // (the existing showState / state-panel system handles this;
+        //  we just need to make the history panel invisible and restore
+        //  the generate panels)
+        hideHistoryPanel();
+        // Re-show the last generate state by touching the existing panels
+        const lastActive = ['configure', 'generating', 'send'].find(k => {
+          const el = panels[k];
+          return el && el.classList.contains('active');
+        });
+        // panels may all be inactive if history was opened before any state was shown
+        if (lastActive) {
+          // already active — just make it visible again
+          const el = panels[lastActive];
+          el.style.display = 'block';
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => el.classList.add('visible'));
+          });
+        } else {
+          showState('configure');
+        }
+      } else {
+        // Switching to history: hide all generate panels without clearing their state
+        hideGeneratePanels();
+        showHistoryPanel();
+        loadHistory();
+      }
+    };
+
+    function hideGeneratePanels() {
+      Object.values(panels).forEach(el => {
+        el.classList.remove('visible');
+        // Use display:none immediately (skip transition) so history panel
+        // occupies the space cleanly
+        el.style.display = 'none';
+      });
+    }
+
+    function hideHistoryPanel() {
+      const hp = document.getElementById('tab-panel-history');
+      hp.classList.remove('visible');
+      setTimeout(() => hp.classList.remove('active'), 200);
+    }
+
+    function showHistoryPanel() {
+      const hp = document.getElementById('tab-panel-history');
+      hp.classList.add('active');
+      // Restore generate panels display property to the state-panel default (none)
+      // so that when we switch back they are correctly hidden
+      Object.values(panels).forEach(el => {
+        el.style.display = '';
+      });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => hp.classList.add('visible'));
+      });
+    }
+
+    // ----------------------------------------------------------------
+    // History — API
+    // ----------------------------------------------------------------
+    async function fetchJobs() {
+      const res = await fetch('/jobs');
+      if (!res.ok) throw new Error(`Failed to load jobs: ${res.status}`);
+      return res.json();
+    }
+
+    async function fetchJobResult(jobId) {
+      const res = await fetch(`/jobs/${jobId}/result`);
+      if (!res.ok) throw new Error(`Failed to load job result: ${res.status}`);
+      return res.json();
+    }
+
+    // ----------------------------------------------------------------
+    // History — List View
+    // ----------------------------------------------------------------
+    async function loadHistory() {
+      const loadingEl  = document.getElementById('history-loading');
+      const errorEl    = document.getElementById('history-error');
+      const emptyEl    = document.getElementById('history-empty');
+      const listEl     = document.getElementById('history-jobs-list');
+
+      setVisible(loadingEl, true);
+      setVisible(errorEl,   false);
+      setVisible(emptyEl,   false);
+      listEl.innerHTML = '';
+
+      try {
+        const data = await fetchJobs();
+        const jobs = data.jobs || [];
+
+        setVisible(loadingEl, false);
+
+        if (jobs.length === 0) {
+          setVisible(emptyEl, true);
+          return;
+        }
+
+        jobs.forEach(job => {
+          listEl.appendChild(buildJobRow(job));
+        });
+      } catch (e) {
+        setVisible(loadingEl, false);
+        document.getElementById('history-error-text').textContent = e.message;
+        setVisible(errorEl, true);
+      }
+    }
+
+    // Expose loadHistory so the inline retry button works
+    window.loadHistory = loadHistory;
+
+    function statusBadgeClass(status) {
+      if (status === 'done')    return 'badge badge-done';
+      if (status === 'partial') return 'badge badge-partial';
+      if (status === 'failed')  return 'badge badge-failed';
+      return 'badge badge-progress';
+    }
+
+    function statusLabel(status) {
+      const labels = {
+        done:       'Done',
+        partial:    'Partial',
+        failed:     'Failed',
+        queued:     'Queued',
+        fetching:   'Fetching',
+        parsing:    'Parsing',
+        generating: 'Generating',
+      };
+      return labels[status] || status;
+    }
+
+    function formatCreatedAt(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    }
+
+    function buildJobRow(job) {
+      const canView = job.status === 'done' || job.status === 'partial' || job.status === 'failed';
+
+      const row = document.createElement('div');
+      row.className = 'bg-slate-900 border border-slate-800 rounded-2xl p-5 card-hover';
+
+      const dateRange = (job.since && job.until)
+        ? formatDateRange(job.since, job.until)
+        : '—';
+      const createdAt = formatCreatedAt(job.created_at);
+
+      row.innerHTML = `
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-slate-100 truncate">${escHtml(dateRange)}</p>
+            <p class="text-xs text-slate-500 mt-0.5">${escHtml(createdAt)}</p>
+          </div>
+          <span class="${statusBadgeClass(job.status)}">${statusLabel(job.status)}</span>
+          <button
+            class="view-btn text-xs font-medium px-3 py-1.5 rounded-lg
+                   ${canView
+                     ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 hover:bg-indigo-500/25 hover:border-indigo-400/40 transition-all duration-150 cursor-pointer'
+                     : 'bg-slate-800/60 text-slate-600 border border-slate-700/50 cursor-not-allowed opacity-50'
+                   }"
+            ${canView ? '' : 'disabled title="Job has not completed"'}
+          >View</button>
+        </div>
+      `;
+
+      if (canView) {
+        const btn = row.querySelector('.view-btn');
+        btn.addEventListener('click', () => openJobDetail(job));
+      }
+
+      return row;
+    }
+
+    // ----------------------------------------------------------------
+    // History — Detail View
+    // ----------------------------------------------------------------
+    function showHistoryList() {
+      setVisible(document.getElementById('history-list-view'),   true);
+      setVisible(document.getElementById('history-detail-view'), false);
+    }
+    window.showHistoryList = showHistoryList;
+
+    async function openJobDetail(job) {
+      // Switch panels
+      setVisible(document.getElementById('history-list-view'),   false);
+      setVisible(document.getElementById('history-detail-view'), true);
+
+      // Populate header
+      const dateRange = (job.since && job.until)
+        ? formatDateRange(job.since, job.until)
+        : '—';
+      document.getElementById('detail-date-range').textContent = dateRange;
+      document.getElementById('detail-created-at').textContent =
+        job.created_at ? `Created ${formatCreatedAt(job.created_at)}` : '';
+
+      const badgeEl = document.getElementById('detail-status-badge');
+      badgeEl.className = statusBadgeClass(job.status);
+      badgeEl.textContent = statusLabel(job.status);
+
+      // Hide all content sections initially
+      setVisible(document.getElementById('detail-partial-warning'), false);
+      setVisible(document.getElementById('detail-failed-notice'),   false);
+      setVisible(document.getElementById('detail-loading'),         false);
+      setVisible(document.getElementById('detail-content'),         false);
+
+      if (job.status === 'failed') {
+        setVisible(document.getElementById('detail-failed-notice'), true);
+        return;
+      }
+
+      // Fetch result
+      setVisible(document.getElementById('detail-loading'), true);
+
+      try {
+        const result = await fetchJobResult(job.id);
+
+        setVisible(document.getElementById('detail-loading'), false);
+
+        // Partial warning
+        if (result.failed_repos && result.failed_repos.length > 0) {
+          setVisible(document.getElementById('detail-partial-warning'), true);
+          const reposList = document.getElementById('detail-failed-repos');
+          reposList.innerHTML = '';
+          result.failed_repos.forEach(repo => {
+            const li = document.createElement('li');
+            li.className = 'text-xs font-mono bg-amber-500/15 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-md';
+            li.textContent = repo;
+            reposList.appendChild(li);
+          });
+        }
+
+        // Markdown content
+        const markdownText = result.markdown_text || '';
+        document.getElementById('detail-markdown').textContent = markdownText;
+        setVisible(document.getElementById('detail-content'), true);
+      } catch (e) {
+        setVisible(document.getElementById('detail-loading'), false);
+        // Show a minimal inline error
+        const contentEl = document.getElementById('detail-content');
+        document.getElementById('detail-markdown').textContent =
+          `Error loading content: ${e.message}`;
+        setVisible(contentEl, true);
+      }
+    }
+
+    // ----------------------------------------------------------------
+    // Boot
+    // ----------------------------------------------------------------
+    init();
+
+  })();
+  </script>
+</body>
+</html>

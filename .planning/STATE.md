@@ -1,80 +1,52 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: unknown
-stopped_at: Completed 01-backend-foundation-02-PLAN.md
-last_updated: "2026-03-21T23:02:43.380Z"
+milestone: v2.0
+milestone_name: (next milestone — not yet defined)
+status: planning_next_milestone
+stopped_at: v1.0 milestone complete — archived 2026-03-23
+last_updated: "2026-03-23T00:00:00.000Z"
 progress:
-  total_phases: 3
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-21)
+See: .planning/PROJECT.md (updated 2026-03-23 after v1.0 milestone)
 
 **Core value:** Non-technical operators can generate and send polished changelogs from multiple repos without ever opening a terminal.
-**Current focus:** Phase 01 — Backend Foundation
+**Current focus:** Planning next milestone — run `/gsd:new-milestone` to begin
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: —
+Plan: —
 
-## Performance Metrics
-
-**Velocity:**
-
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: 0 hours
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| - | - | - | - |
-
-**Recent Trend:**
-
-- Last 5 plans: —
-- Trend: —
-
-*Updated after each plan completion*
-| Phase 01-backend-foundation P01 | 3 | 3 tasks | 4 files |
-| Phase 01-backend-foundation P02 | 3 | 3 tasks | 4 files |
+Milestone v1.0 shipped. All 3 phases complete.
+Archive: `.planning/milestones/v1.0-ROADMAP.md`
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- Init: No auth in v1 — internal tool assumption, reduces scope
-- Init: UI wraps existing CLI via direct import, not subprocess — pipeline stays intact
-- [Phase 01-backend-foundation]: Used asynccontextmanager lifespan pattern (not deprecated @app.on_event) for FastAPI startup
-- [Phase 01-backend-foundation]: jobs.db placed at changelogs/jobs.db — inside existing changelogs/ output directory (already in .gitignore)
-- [Phase 01-backend-foundation]: Status values: queued/fetching/parsing/generating/done/failed/partial per D-01, D-02, D-03 decisions
-- [Phase 01-backend-foundation]: GET /jobs/{id} returns status fields only; GET /jobs/{id}/result returns rendered content — separates polling from payload transfer
-- [Phase 01-backend-foundation]: intelligence_json kept internal — not exposed in any API response
-- [Phase 01-backend-foundation]: os.replace used for atomic last_run.json update (Pitfall 10) — web and CLI share same file
+All v1.0 decisions logged in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-None yet.
+- Consider wiring `config_snapshot` at job creation time (or drop the column)
+- Consider adding user-facing error when GET /config fails (targets hidden silently)
+- No VALIDATION.md (Nyquist) created for any v1 phase — low priority for internal tool
 
 ### Blockers/Concerns
 
-- Phase 4 (Admin Config) deferred to v2 — secrets storage strategy (write to .env vs. SQLite vs. env-only indicator) needs a decision before that work begins. Not blocking v1.
+- Admin Config (secrets storage strategy: .env vs SQLite vs env-only) needs a decision before any v2 admin work begins.
 
 ## Session Continuity
 
-Last session: 2026-03-21T22:59:23.826Z
-Stopped at: Completed 01-backend-foundation-02-PLAN.md
-Resume file: None
+Last session: 2026-03-23
+Stopped at: v1.0 milestone archive complete
+Resume: `/gsd:new-milestone` to start v2.0 planning

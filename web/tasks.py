@@ -47,8 +47,7 @@ def _fetch_repo(repo_cfg: dict, config: dict, since: datetime, until: datetime) 
     elif provider == "bitbucket":
         from src.fetchers.bitbucket import fetch_commits
         commits = fetch_commits(
-            username=env["bitbucket_username"],
-            app_password=env["bitbucket_app_password"],
+            api_token=env["bitbucket_api_token"],
             workspace=repo_cfg["workspace"],
             repo=repo_cfg["repo"],
             branch=repo_cfg.get("branch", "main"),
@@ -84,7 +83,7 @@ def _update_last_run(until: datetime) -> None:
             pass
 
 
-def run_pipeline(job_id: str, since_str: str, until_str: str) -> None:
+def run_pipeline(job_id: str, since_str: str, until_str: str, tone_override: str | None = None) -> None:
     """
     Run the full changelog pipeline for a job.
     Called synchronously by FastAPI BackgroundTasks in a thread.
@@ -93,6 +92,8 @@ def run_pipeline(job_id: str, since_str: str, until_str: str) -> None:
         job_id: UUID string from db.create_job()
         since_str: ISO date string "YYYY-MM-DD"
         until_str: ISO date string "YYYY-MM-DD"
+        tone_override: Optional tone to override config.changelog.tone for this job only.
+                       Accepted values: "business" | "technical" | "executive"
     """
     try:
         since = datetime.strptime(since_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -100,6 +101,10 @@ def run_pipeline(job_id: str, since_str: str, until_str: str) -> None:
 
         # Load config once — never reload mid-pipeline (Pitfall 4)
         config = load_config()
+
+        # Apply tone override (D-03 from 02-CONTEXT): mutate in-memory copy only, never write to disk
+        if tone_override:
+            config.setdefault("changelog", {})["tone"] = tone_override
 
         # Stage 1: Fetching
         update_job_status(job_id, "fetching", "Fetching commits from repositories...")

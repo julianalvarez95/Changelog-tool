@@ -148,8 +148,7 @@ def fetch_repo_commits(repo_cfg: dict, config: dict, since: datetime, until: dat
     elif provider == "bitbucket":
         from src.fetchers.bitbucket import fetch_commits
         return fetch_commits(
-            username=env["bitbucket_username"],
-            app_password=env["bitbucket_app_password"],
+            api_token=env["bitbucket_api_token"],
             workspace=repo_cfg["workspace"],
             repo=repo_cfg["repo"],
             branch=repo_cfg.get("branch", "main"),

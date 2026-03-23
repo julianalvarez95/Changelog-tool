@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A web UI layer on top of the existing changelog-tool CLI. Internal operators (technical and non-technical) use it to configure, generate, preview, and distribute changelogs to stakeholders — without touching the command line. The bigger vision is a stakeholder portal where stakeholders read changelogs directly in the app.
+A web UI layer on top of the existing changelog-tool CLI. Internal operators (technical and non-technical) use it to configure, generate, and distribute changelogs to Slack and email — without touching the command line. v1.0 shipped the complete configure → generate → send → history loop. The bigger vision is a stakeholder portal where stakeholders read changelogs directly in the app.
 
 ## Core Value
 
@@ -12,29 +12,44 @@ Non-technical operators can generate and send polished changelogs from multiple 
 
 ### Validated
 
-- [x] User can trigger changelog generation — Validated in Phase 1: Backend Foundation (async job API)
-- [x] User can observe async progress during generation — Validated in Phase 1: Backend Foundation (GET /jobs/{id} status polling)
+- ✓ User can trigger changelog generation from the UI — v1.0 (POST /jobs, async 202 response)
+- ✓ User sees async generation progress while the pipeline runs — v1.0 (GET /jobs/{id} polling, stage-level messages)
+- ✓ User can select a date range (from/until) before generating — v1.0 (date inputs wired to POST /jobs)
+- ✓ User can select distribution targets before generating — v1.0 (checkboxes from GET /config → POST /jobs/{id}/send)
+- ✓ User can configure tone/format before generating — v1.0 (tone radio → run_pipeline tone_override)
+- ✓ User can send the generated changelog to selected distribution targets — v1.0 (POST /jobs/{id}/send → Slack + email)
+- ✓ User sees per-channel send result (success or failure) — v1.0 (per-target success/error rendered inline)
+- ✓ User can browse an archive of all past generated changelogs — v1.0 (GET /jobs list, history tab)
+- ✓ User can open a past changelog entry and view its content — v1.0 (GET /jobs/{id}/result, history detail view)
 
 ### Active
 
-- [ ] User can configure date range for changelog generation
-- [ ] User can select distribution target (Slack channel, email list)
-- [ ] User can configure tone/format (technical detail level)
-- [ ] User can trigger changelog generation
-- [ ] User can preview the generated changelog before sending
-- [ ] User can send the changelog to configured distribution targets
-- [ ] User can browse a history of past generated changelogs
-- [ ] Admin can configure repos and API tokens through the UI
+*(None — all v1 requirements validated. New requirements defined for next milestone.)*
 
 ### Out of Scope
 
 - User authentication / login — internal tool, deferred to later
 - Stakeholder portal (read-only view for stakeholders) — v2 vision, not v1
 - Scheduling / recurring changelogs — not in initial scope
+- Preview before send — opted for generate → send direct flow; revisit in v2
+- Admin config management — config stays in config.yaml + .env; reduces attack surface
+- Inline changelog editing — undermines automation value; deliberate exclusion
 
 ## Current State
 
-Phase 1 complete — Async job engine, SQLite schema, and job API endpoints (POST /jobs, GET /jobs/{id}, GET /jobs/{id}/result) are live. FastAPI app runs via `uvicorn web.app:app`. CLI unchanged.
+v1.0 shipped. Full operator workflow is live:
+- FastAPI app serves the web UI from `web/static/index.html`
+- Run: `uvicorn web.app:app --reload --host 0.0.0.0 --port 8000`
+- CLI (`python3 changelog.py`) unchanged and fully functional
+- Database: `changelogs/jobs.db` (SQLite, auto-created on startup)
+- ~5,700 LOC added across 31 files
+- Tech stack: FastAPI + vanilla JS + Tailwind CDN + SQLite
+
+**Known tech debt (v1.0):**
+- Phases 2 & 3 shipped without formal GSD verification artifacts (no PLAN.md / SUMMARY.md / VERIFICATION.md)
+- No VALIDATION.md (Nyquist) for any phase
+- `config_snapshot` column always NULL (wired but unused)
+- GET /config failure hides distribution targets silently (no user error message)
 
 ## Context
 
@@ -43,7 +58,7 @@ Phase 1 complete — Async job engine, SQLite schema, and job API endpoints (POS
 - Uses OpenAI to generate structured summaries, falls back to raw parsed commits
 - Distributes via Slack SDK and Gmail SMTP
 - Config lives in `config.yaml` (repos, categories, LLM settings) and `.env` (secrets)
-- The UI will wrap the existing Python pipeline — not replace it
+- The UI wraps the existing Python pipeline — not replacing it
 - Admin-configured repos and tokens are set once; operators pick from that pool
 
 ## Constraints
@@ -56,27 +71,13 @@ Phase 1 complete — Async job engine, SQLite schema, and job API endpoints (POS
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| No auth in v1 | Internal tool, reduces scope significantly | — Pending |
-| UI wraps existing CLI | Existing pipeline is solid, no need to rewrite | — Pending |
+| No auth in v1 | Internal tool, reduces scope significantly | ✓ Good — shipped faster |
+| UI wraps existing CLI via direct import | Existing pipeline is solid, no need to rewrite | ✓ Good — no regressions |
+| Vanilla JS + Tailwind CDN (no build step) | Deployable without toolchain, fast to iterate | ✓ Good — kept it simple |
+| Phases 2 & 3 shipped in one commit | Expedited delivery, accepted artifact gap | ⚠ Revisit — missed verification artifacts |
+| SQLite for job persistence | Simple, no infra, zero config | ✓ Good — right tool for internal tool |
+| `config_snapshot` column reserved but unused | Future option for per-job config snapshots | — Pending — may drop in v2 |
 
 ---
 
-## Evolution
-
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `/gsd:transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `/gsd:complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
-
----
-*Last updated: 2026-03-21 after Phase 1 completion*
+*Last updated: 2026-03-23 after v1.0 milestone*
